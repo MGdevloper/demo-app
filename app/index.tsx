@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
+  BackHandler,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -9,7 +10,7 @@ import {
 } from 'react-native';
 
 import * as Google from 'expo-auth-session/providers/google';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { getUser, saveUserData,isUserLoggedIn} from "../authentication.config.js"
 import GoogleConfig from '../googleConfig';
@@ -30,8 +31,28 @@ export default function HomeScreen() {
     }); 
     
   }, []);
+
+    useFocusEffect(
+      React.useCallback(() => {
+        const subscription = BackHandler.addEventListener(
+          'hardwareBackPress',
+          () => {
+            BackHandler.exitApp();
+            return true;
+          }
+        );
+  
+        return () => subscription.remove();
+      }, [])
+    );
   
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const showLoginError = (message: string) => {
+    setErrorMessage(message);
+    setLoading(false);
+  };
 
   const [request, response, promptAsync] = Google.useAuthRequest({
 
@@ -56,12 +77,7 @@ export default function HomeScreen() {
     } catch (error) {
       console.log('Google Login Error:', error);
 
-      Alert.alert(
-        'Login Failed',
-        'Something went wrong. Please try again.'
-      );
-
-      setLoading(false);
+      showLoginError('Something went wrong. Please try again.');
     }
   };
 
@@ -75,6 +91,13 @@ export default function HomeScreen() {
 
       getUser(response.params.access_token).then(async (user) => {
 
+        const email = user?.email?.trim().toLowerCase();
+        if (!email || !email.endsWith('@charusat.edu.in')) {
+          showLoginError('Please use your @charusat.edu.in Google account.');
+          router.replace('/');
+          return;
+        }
+
         await saveUserData(user)
         console.log('Google Login Successful!');
 
@@ -84,12 +107,7 @@ export default function HomeScreen() {
       }).catch((error) => {
         console.log('Error fetching user data:', error);
 
-        Alert.alert(
-          'Login Failed',
-          'Failed to fetch user data. Please try again.'
-        );
-
-        setLoading(false);
+        showLoginError('Failed to fetch user data. Please try again.');
         return;
       })
 
@@ -100,13 +118,7 @@ export default function HomeScreen() {
     } else if (response.type === 'error') {
       console.log('Google Login Error:', response.error);
 
-      Alert.alert(
-        'Login Failed',
-        response.error?.message ||
-        'Google authentication failed.'
-      );
-
-      setLoading(false);
+      showLoginError(response.error?.message || 'Google authentication failed.');
     } else if (
       response.type === 'cancel' ||
       response.type === 'dismiss'
@@ -151,6 +163,29 @@ export default function HomeScreen() {
       <Text style={styles.note}>
         Only @charusat.edu.in accounts are allowed.
       </Text>
+
+      <Modal
+        visible={errorMessage !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setErrorMessage(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.errorCard}>
+            <View style={styles.errorIcon}>
+              <Text style={styles.errorIconText}>!</Text>
+            </View>
+            <Text style={styles.errorTitle}>Login failed</Text>
+            <Text style={styles.errorMessage}>{errorMessage}</Text>
+            <Pressable
+              style={styles.dismissButton}
+              onPress={() => setErrorMessage(null)}
+            >
+              <Text style={styles.dismissButtonText}>Got it</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -210,5 +245,72 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#777',
     textAlign: 'center',
+  },
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  },
+
+  errorCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    padding: 28,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+
+  errorIcon: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderRadius: 26,
+    backgroundColor: '#fef2f2',
+  },
+
+  errorIconText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#dc2626',
+  },
+
+  errorTitle: {
+    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+
+  errorMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    color: '#6b7280',
+  },
+
+  dismissButton: {
+    width: '100%',
+    marginTop: 24,
+    paddingVertical: 13,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#111827',
+  },
+
+  dismissButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

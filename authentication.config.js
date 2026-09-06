@@ -47,8 +47,14 @@ async function isUserLoggedIn() {
 }
 
 
+async function getSavedUser() {
+  const userData = await AsyncStorage.getItem('user');
+
+  return userData ? JSON.parse(userData) : null;
+}
 
 
 
 
-export { getUser,saveUserData,removeUserData,isUserLoggedIn };
+
+export { getUser, saveUserData, removeUserData, isUserLoggedIn, getSavedUser }; 

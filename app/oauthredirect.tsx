@@ -1,6 +1,9 @@
+import { useEffect } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
 
 export default function OAuthRedirect() {
+
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" />
